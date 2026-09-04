@@ -39,6 +39,7 @@ const loginUser = async (email, password) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            avatarUrl: user.avatarUrl,
         },
         token,
     };
@@ -56,7 +57,51 @@ const getUserById = async (id) => {
     return user;
 };
 
+const updateProfile = async (id, { name, email }) => {
+    const user = await getUserById(id);
+
+    if (email && email !== user.email) {
+        const existing = await User.findOne({ where: { email } });
+        if (existing) {
+            throw new AppError("Email is already in use", 409);
+        }
+    }
+
+    await user.update({
+        ...(name !== undefined ? { name } : {}),
+        ...(email !== undefined ? { email } : {}),
+    });
+
+    return user;
+};
+
+const changePassword = async (id, { currentPassword, newPassword }) => {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+        throw new AppError("User not found", 404);
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isCurrentValid) {
+        throw new AppError("Current password is incorrect", 400);
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashed });
+};
+
+const updateAvatar = async (id, avatarUrl) => {
+    const user = await getUserById(id);
+    await user.update({ avatarUrl });
+    return user;
+};
+
 module.exports = {
     loginUser,
     getUserById,
+    updateProfile,
+    changePassword,
+    updateAvatar,
 };

@@ -33,6 +33,12 @@ module.exports = (sequelize) => {
                 type: DataTypes.STRING,
                 defaultValue: "admin",
             },
+
+            avatarUrl: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                field: "avatar_url",
+            },
         },
         {
             tableName: "users",

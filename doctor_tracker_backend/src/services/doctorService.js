@@ -53,6 +53,29 @@ const updateDoctor = async (id, data) => {
     return doctor;
 };
 
+const getDoctorPatients = async (id, { page, limit }) => {
+    await getDoctorById(id);
+
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Patient.findAndCountAll({
+        where: { doctorId: id },
+        limit,
+        offset,
+        order: [["createdAt", "DESC"]],
+    });
+
+    return {
+        patients: rows,
+        pagination: {
+            total: count,
+            page,
+            limit,
+            totalPages: Math.max(Math.ceil(count / limit), 1),
+        },
+    };
+};
+
 const deleteDoctor = async (id) => {
     const doctor = await getDoctorById(id);
 
@@ -72,6 +95,7 @@ module.exports = {
     createDoctor,
     getDoctors,
     getDoctorById,
+    getDoctorPatients,
     updateDoctor,
     deleteDoctor,
 };

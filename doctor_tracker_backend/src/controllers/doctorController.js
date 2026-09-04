@@ -44,6 +44,22 @@ const getOne = async (req, res, next) => {
     }
 };
 
+const getPatients = async (req, res, next) => {
+    try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+
+        const result = await doctorService.getDoctorPatients(req.params.id, { page, limit });
+
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const update = async (req, res, next) => {
     try {
         const doctor = await doctorService.updateDoctor(req.params.id, req.body);
@@ -75,6 +91,7 @@ module.exports = {
     create,
     list,
     getOne,
+    getPatients,
     update,
     remove,
 };

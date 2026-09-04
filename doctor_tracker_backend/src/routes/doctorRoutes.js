@@ -15,6 +15,11 @@ router.use(authMiddleware);
 router.post("/", validate(createDoctorSchema), doctorController.create);
 router.get("/", doctorController.list);
 router.get("/:id", validate(idParamSchema, "params"), doctorController.getOne);
+router.get(
+    "/:id/patients",
+    validate(idParamSchema, "params"),
+    doctorController.getPatients
+);
 router.put(
     "/:id",
     validate(idParamSchema, "params"),

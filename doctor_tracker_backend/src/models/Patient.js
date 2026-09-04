@@ -61,6 +61,11 @@ module.exports = (sequelize) => {
             foreignKey: "doctorId",
             as: "doctor",
         });
+        Patient.hasMany(models.Appointment, {
+            foreignKey: "patientId",
+            as: "appointments",
+            onDelete: "RESTRICT",
+        });
     };
 
     return Patient;

@@ -1,3 +1,4 @@
+const multer = require("multer");
 const AppError = require("../utils/AppError");
 
 const notFoundHandler = (req, res, next) => {
@@ -10,6 +11,17 @@ const errorHandler = (error, req, res, next) => {
             success: false,
             message: error.message,
             ...(error.errors ? { errors: error.errors } : {}),
+        });
+    }
+
+    if (error instanceof multer.MulterError) {
+        const message =
+            error.code === "LIMIT_FILE_SIZE"
+                ? "Image must be 2MB or smaller"
+                : "Image upload failed";
+        return res.status(400).json({
+            success: false,
+            message,
         });
     }
 
