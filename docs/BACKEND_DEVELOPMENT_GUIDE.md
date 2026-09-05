@@ -21,7 +21,8 @@ This is not a generic "what is Express" table. It's what each dependency in `pac
 | **cors** | `app.js:18-22` | Restricts which origin can call the API — configured from `CORS_ORIGIN` env var, not wide-open. Necessary because the Next.js frontend runs on a different origin/port. | An open `origin: "*"` would work for public read-only APIs but is wrong here since requests carry an `Authorization` header. |
 | **morgan** | `app.js:23` | Logs every request (method, path, status, timing) — `"combined"` format in production, `"dev"` format otherwise. | A full logging stack (Winston, pino, ELK) would be over-engineering for an internal single-instance admin tool; Morgan's stdout logging is enough and is explicitly what the spec calls for ("Morgan or a lightweight logging solution"). |
 | **express-rate-limit** | `src/middleware/rateLimiters.js` | Caps login attempts to slow down credential stuffing / brute force. Applied only to `POST /api/auth/login` (`src/routes/authRoutes.js:11`). | A more elaborate solution (e.g. IP+account lockout tracked in a DB, CAPTCHA) is unnecessary for an internal tool with one admin account; a cheap in-memory limiter covers the realistic threat model. |
-| **multer** | `src/middleware/uploadAvatar.js` | Parses `multipart/form-data` for the avatar upload endpoint, writes the file to disk, enforces a MIME allowlist and a 2MB size cap. | Storing avatars in the DB as BLOBs would bloat the database and complicate backups for no benefit at this scale; disk storage + a static file route (`app.js:28-33`) is simpler. |
+| **multer** | `src/middleware/uploadAvatar.js` | Parses `multipart/form-data` for the avatar upload endpoint, enforces a MIME allowlist and a 2MB size cap. | Needed regardless of where the file ends up — Express doesn't parse multipart bodies itself. |
+| **cloudinary** + **multer-storage-cloudinary** | `src/config/cloudinary.js`, `src/middleware/uploadAvatar.js` | Avatars are uploaded straight to Cloudinary (folder `doctor-tracker/avatars`) instead of local disk — `CloudinaryStorage` plugs into multer as its storage engine, so the upload streams directly to Cloudinary during the multipart parse. `avatarUrl` stores the returned `secure_url` (an absolute `https://res.cloudinary.com/...` URL) instead of a local `/uploads/...` path. | Local disk storage doesn't survive most deployment platforms (ephemeral filesystems on redeploy) and doesn't scale past one server instance; Cloudinary is free at this scale and removes that entire class of problem. A legacy fallback still exists in `authController.js` (`extractCloudinaryPublicId` / the `/uploads/avatars/` branch) for any avatar uploaded before this migration. |
 | **jest + supertest** | `tests/*.test.js`, `package.json`'s `test` script | Jest is the runner/assertion library. Supertest drives real HTTP requests directly against the exported `app` object (no listening port needed), which is why `app.js` never calls `.listen()` — that's `server.js`'s job. | This split is why tests can `require("../app")` cleanly (see `tests/appointments.test.js:2`) instead of needing to spin up and tear down a real network server per test file. |
 | **dotenv** | `app.js`, `server.js`, `seedAdmin.js`, `src/config/*.js`, `tests/setup/globalSetup.js` | Loads `.env` into `process.env` at the top of every entry point that needs config. | — |
 | **nodemon** (dev) | `npm run dev` script | Restarts the dev server on file change. | — |
@@ -56,9 +57,12 @@ doctor_tracker_backend/
 │   │   ├── config.js              Plain object (development/test/production) sequelize-cli
 │   │   │                           reads directly — test DB name defaults to `${DB_NAME}_test`
 │   │   │                           unless DB_NAME_TEST is set.
-│   │   └── database.js            Builds the actual live Sequelize instance used by the app
-│   │                               at runtime (reads config.js for the current NODE_ENV),
-│   │                               and exports testDatabaseConnection() used by server.js.
+│   │   ├── database.js            Builds the actual live Sequelize instance used by the app
+│   │   │                           at runtime (reads config.js for the current NODE_ENV),
+│   │   │                           and exports testDatabaseConnection() used by server.js.
+│   │   └── cloudinary.js          Configures the Cloudinary SDK from CLOUDINARY_* env vars.
+│   │                               Imported by uploadAvatar.js (as the multer storage engine)
+│   │                               and authController.js (to destroy a replaced avatar).
 │   │
 │   ├── models/
 │   │   ├── index.js                Dynamically requires every other file in this folder,
@@ -125,9 +129,10 @@ doctor_tracker_backend/
 │   │   │                              parsed/coerced data.
 │   │   ├── rateLimiters.js            loginLimiter: 5 requests / 15 minutes per IP,
 │   │   │                              standardHeaders on, custom JSON message.
-│   │   ├── uploadAvatar.js            multer config: disk storage under uploads/avatars/,
-│   │   │                              filename user-<id>-<timestamp>.<ext>, MIME allowlist
-│   │   │                              (jpeg/png/webp only), 2MB limit.
+│   │   ├── uploadAvatar.js            multer + CloudinaryStorage (uploads straight to
+│   │   │                              Cloudinary, folder doctor-tracker/avatars, public_id
+│   │   │                              user-<id>-<timestamp>), MIME allowlist (jpeg/png/webp
+│   │   │                              only), 2MB limit.
 │   │   └── errorHandler.js            notFoundHandler (404 catch-all) + errorHandler (the
 │   │                                  single place every error is turned into the standard
 │   │                                  JSON response shape — see Part 3, step 7).
@@ -147,8 +152,11 @@ doctor_tracker_backend/
 │
 ├── uploads/
 │   ├── .gitkeep
-│   └── avatars/                        Actual uploaded avatar files (gitignored except the
-│                                       .gitkeep marker), served statically at /uploads/*.
+│   └── avatars/                        Legacy local avatar storage from before the Cloudinary
+│                                       migration - kept (with its static /uploads/* route,
+│                                       app.js:28-33) only so any avatarUrl saved before the
+│                                       switch still resolves. New avatars go straight to
+│                                       Cloudinary; this folder stays empty going forward.
 │
 └── tests/
     ├── setup/
@@ -246,6 +254,7 @@ Every variable in `.env.example`, explained:
 | `JWT_EXPIRES_IN` | How long a login token stays valid, passed straight to `jwt.sign(..., { expiresIn: process.env.JWT_EXPIRES_IN || "1d" })` (`authService.js:32`). `.env.example` recommends `7d`; note the code's own fallback if the var is unset is `"1d"`, not `"7d"` — set it explicitly rather than relying on the fallback. |
 | `CORS_ORIGIN` | The exact origin allowed to call this API (`app.js:18-22`), e.g. `http://localhost:3000` for the Next.js dev server. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Only read by `seedAdmin.js:8-13` — not used anywhere else in the running app. |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Read once in `src/config/cloudinary.js` to configure the Cloudinary SDK. Required for `POST /api/auth/avatar` to work — without them, `cloudinary.config()` has no credentials and every upload fails at Cloudinary's side (a 401 from Cloudinary itself, not this app). |
 
 ```bash
 # 3. Make sure the MySQL database named in DB_NAME exists

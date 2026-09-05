@@ -1,23 +1,22 @@
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 const AppError = require("../utils/AppError");
 
-const AVATAR_DIR = path.resolve(__dirname, "../../uploads/avatars");
-fs.mkdirSync(AVATAR_DIR, { recursive: true });
-
 const ALLOWED_MIME_TYPES = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
 };
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, AVATAR_DIR),
-    filename: (req, file, cb) => {
-        const ext = ALLOWED_MIME_TYPES[file.mimetype] || path.extname(file.originalname);
-        cb(null, `user-${req.user.id}-${Date.now()}${ext}`);
-    },
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: (req, file) => ({
+        folder: "doctor-tracker/avatars",
+        public_id: `user-${req.user.id}-${Date.now()}`,
+        format: ALLOWED_MIME_TYPES[file.mimetype],
+        resource_type: "image",
+    }),
 });
 
 const fileFilter = (req, file, cb) => {
@@ -33,4 +32,4 @@ const uploadAvatar = multer({
     limits: { fileSize: 2 * 1024 * 1024 },
 }).single("avatar");
 
-module.exports = { uploadAvatar, AVATAR_DIR };
+module.exports = { uploadAvatar };
