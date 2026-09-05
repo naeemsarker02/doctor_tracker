@@ -18,12 +18,14 @@ const seedAdmin = async () => {
             where: { email: ADMIN_EMAIL },
         });
 
+        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+
         if (existingAdmin) {
-            console.log("Admin already exists.");
+            existingAdmin.password = hashedPassword;
+            await existingAdmin.save();
+            console.log("✅ Admin password updated successfully.");
             process.exit(0);
         }
-
-        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
         await User.create({
             name: "Admin",
