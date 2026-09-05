@@ -25,6 +25,9 @@ api.interceptors.response.use(
             window.location.pathname !== "/login"
         ) {
             window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+            // Deliberate hard navigation (not next/navigation) so the TanStack Query
+            // cache and all in-memory state are wiped along with the expired session.
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.href = "/login";
         }
         return Promise.reject(error);

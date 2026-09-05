@@ -71,6 +71,9 @@ export function AppointmentFormModal({
 
     useEffect(() => {
         if (!isOpen) return;
+        // Reset local form state to match whichever appointment (or none) this modal
+        // was opened for - intentional prop-driven sync, not derivable at render time.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFieldErrors({});
         setForm(
             appointment

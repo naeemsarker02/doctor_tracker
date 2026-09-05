@@ -36,6 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const token = getAuthToken();
         if (!token) {
+            // No token to bootstrap from - intentional one-time sync on mount, not
+            // derivable at render time.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLoading(false);
             return;
         }

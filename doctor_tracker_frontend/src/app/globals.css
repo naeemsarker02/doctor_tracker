@@ -3,6 +3,12 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --chart-primary: #4f46e5;
+  --chart-primary-hover: #6366f1;
+  --chart-grid: #e2e8f0;
+  --chart-tick: #64748b;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #e2e8f0;
 }
 
 @theme inline {
@@ -16,6 +22,12 @@
   :root {
     --background: #030712;
     --foreground: #f1f5f9;
+    --chart-primary: #6366f1;
+    --chart-primary-hover: #818cf8;
+    --chart-grid: #1e293b;
+    --chart-tick: #94a3b8;
+    --chart-tooltip-bg: #0f172a;
+    --chart-tooltip-border: #1e293b;
   }
 }
 

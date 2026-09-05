@@ -1,29 +1,65 @@
-const CHART_HEIGHT_PX = 128; // matches h-32 on the container below
+"use client";
+
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+const CHART_HEIGHT_PX = 160;
+
+function formatShortDate(iso: string | number) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return String(iso);
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatAxisDate(value: unknown) {
+    return formatShortDate(value as string);
+}
 
 export function TrendChart({ data }: { data: { date: string; count: number }[] }) {
     if (data.length === 0) {
         return <p className="text-sm text-slate-500 dark:text-slate-400">No data yet.</p>;
     }
 
-    const max = Math.max(1, ...data.map((point) => point.count));
-
     return (
-        <div className="flex h-32 items-end gap-1">
-            {data.map((point) => (
-                <div
-                    key={point.date}
-                    className="group relative flex-1"
-                    title={`${point.date}: ${point.count}`}
-                >
-                    {/* Pixel height, not a % — the wrapper is a flex item with
-                        items-end, so it shrink-wraps its content and never gets
-                        a definite height for a % child to resolve against. */}
-                    <div
-                        className="w-full rounded-t bg-indigo-600 transition-colors group-hover:bg-indigo-400 dark:bg-indigo-500 dark:group-hover:bg-indigo-400"
-                        style={{ height: Math.max(4, (point.count / max) * CHART_HEIGHT_PX) }}
+        <div style={{ height: CHART_HEIGHT_PX }}>
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                    <XAxis
+                        dataKey="date"
+                        tickFormatter={formatAxisDate}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                        tick={{ fill: "var(--chart-tick)", fontSize: 11 }}
                     />
-                </div>
-            ))}
+                    <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        width={28}
+                        tick={{ fill: "var(--chart-tick)", fontSize: 11 }}
+                    />
+                    <Tooltip
+                        cursor={{ fill: "var(--chart-grid)" }}
+                        contentStyle={{
+                            background: "var(--chart-tooltip-bg)",
+                            border: "1px solid var(--chart-tooltip-border)",
+                            borderRadius: 8,
+                            fontSize: 12,
+                        }}
+                        labelFormatter={formatAxisDate}
+                        labelStyle={{ color: "var(--foreground)", marginBottom: 2 }}
+                        itemStyle={{ color: "var(--chart-tick)" }}
+                        formatter={(value) => [value, "Registrations"]}
+                    />
+                    <Bar
+                        dataKey="count"
+                        fill="var(--chart-primary)"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={28}
+                    />
+                </BarChart>
+            </ResponsiveContainer>
         </div>
     );
 }

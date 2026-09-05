@@ -20,7 +20,7 @@ export function TopBar() {
 
     return (
         <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur-sm sm:px-6 dark:border-slate-800 dark:bg-slate-950/80">
-            <nav className="flex items-center gap-1 md:hidden">
+            <nav className="flex min-w-0 items-center gap-1 overflow-x-auto md:hidden">
                 {mobileNavItems.map((item) => {
                     const isActive =
                         item.href === "/dashboard"
@@ -31,15 +31,20 @@ export function TopBar() {
                         <Link
                             key={item.href}
                             href={item.href}
+                            title={item.label}
                             className={cn(
-                                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                                "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
                                 isActive
                                     ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
                                     : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                             )}
                         >
-                            <Icon className="size-3.5" />
-                            {item.label}
+                            <Icon className="size-3.5 shrink-0" />
+                            {/* Below `sm`, an icon+label nav can't fit alongside the avatar/logout
+                                controls on a real phone width - icon-only (with a title tooltip)
+                                mirrors the sidebar's own collapsed pattern instead of introducing
+                                a new one. */}
+                            <span className="hidden sm:inline">{item.label}</span>
                         </Link>
                     );
                 })}
@@ -47,7 +52,7 @@ export function TopBar() {
 
             <div className="hidden md:block" />
 
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-3">
                 <Link
                     href="/dashboard/profile"
                     className={cn(

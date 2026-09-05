@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Doctor, Patient } = require("../models");
+const { Doctor, Patient, Appointment } = require("../models");
 const AppError = require("../utils/AppError");
 
 const createDoctor = async (data) => {
@@ -84,6 +84,19 @@ const deleteDoctor = async (id) => {
     if (patientCount > 0) {
         throw new AppError(
             "Cannot delete a doctor with existing patients. Reassign or remove their patients first.",
+            409
+        );
+    }
+
+    // "Upcoming" here means still-open appointments — Cancelled and Completed
+    // ones are historical and shouldn't block reassigning/removing a doctor.
+    const upcomingAppointmentCount = await Appointment.count({
+        where: { doctorId: id, status: { [Op.notIn]: ["Cancelled", "Completed"] } },
+    });
+
+    if (upcomingAppointmentCount > 0) {
+        throw new AppError(
+            "Cannot delete a doctor with upcoming appointments. Cancel or reassign them first.",
             409
         );
     }

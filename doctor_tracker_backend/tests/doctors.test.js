@@ -1,7 +1,7 @@
 const request = require("supertest");
 const app = require("../app");
 const { resetDb, loginAsAdmin, sequelize } = require("./helpers/testUtils");
-const { Doctor, Patient } = require("../src/models");
+const { Doctor, Patient, Appointment } = require("../src/models");
 
 describe("Doctor CRUD", () => {
     let token;
@@ -171,5 +171,80 @@ describe("Doctor CRUD", () => {
 
         const stillThere = await Doctor.findByPk(doctor.id);
         expect(stillThere).not.toBeNull();
+    });
+
+    it("blocks deleting a doctor with an upcoming (non-Cancelled) appointment (409)", async () => {
+        const doctor = await Doctor.create({
+            name: "Dr Bob",
+            specialization: "Neurology",
+            hospital: "City Hospital",
+            phone: "1",
+        });
+
+        const patient = await Patient.create({
+            doctorId: doctor.id,
+            name: "Patient Y",
+            age: 40,
+            gender: "male",
+            phone: "1",
+            condition: "migraine",
+        });
+        // No patients left pointing at this doctor by the time of delete —
+        // isolates the assertion to the appointment guard specifically.
+        await patient.destroy();
+
+        await Appointment.create({
+            doctorId: doctor.id,
+            patientId: patient.id,
+            appointmentDate: "2027-01-01",
+            appointmentTime: "10:00",
+            status: "Pending",
+        });
+
+        const res = await authed(request(app).delete(`/api/doctors/${doctor.id}`));
+        expect(res.status).toBe(409);
+
+        const stillThere = await Doctor.findByPk(doctor.id);
+        expect(stillThere).not.toBeNull();
+    });
+
+    it("allows deleting a doctor whose only appointments are Cancelled or Completed", async () => {
+        const doctor = await Doctor.create({
+            name: "Dr Carol",
+            specialization: "Pediatrics",
+            hospital: "City Hospital",
+            phone: "1",
+        });
+
+        const patient = await Patient.create({
+            doctorId: doctor.id,
+            name: "Patient Z",
+            age: 12,
+            gender: "female",
+            phone: "1",
+            condition: "checkup",
+        });
+        await patient.destroy();
+
+        await Appointment.create({
+            doctorId: doctor.id,
+            patientId: patient.id,
+            appointmentDate: "2020-01-01",
+            appointmentTime: "10:00",
+            status: "Completed",
+        });
+        await Appointment.create({
+            doctorId: doctor.id,
+            patientId: patient.id,
+            appointmentDate: "2020-01-02",
+            appointmentTime: "10:00",
+            status: "Cancelled",
+        });
+
+        const res = await authed(request(app).delete(`/api/doctors/${doctor.id}`));
+        expect(res.status).toBe(200);
+
+        const found = await Doctor.findByPk(doctor.id);
+        expect(found).toBeNull();
     });
 });
